@@ -1,0 +1,36 @@
+# Traefik will listen for traffic on both HTTP and HTTPS.
+defaultEntryPoints = ["http", "https"]
+
+# Network traffic will be entering our Docker network on the usual web ports
+# (ie, 80 and 443), where Traefik will be listening.
+[entryPoints]
+  [entryPoints.http]
+  address = ":80"
+  # Uncomment the following two lines to redirect HTTP to HTTPS.
+  #[entryPoints.http.redirect]
+  #entryPoint = "https"
+  [entryPoints.https]
+  address = ":443"
+    [entryPoints.https.tls]
+
+# These options are for Traefik's integration with Docker.
+[docker]
+endpoint = "unix:///var/run/docker.sock"
+domain = "docker.localhost"
+watch = true
+exposedByDefault = false
+
+# These options are for Traefik's integration with Let's Encrypt.
+# Your certificates are stored inside /acme.json inside the container,
+# which is /root/compose/acme.json on your server.
+[acme]
+storage = "./config/acme.json"
+onHostRule = true
+entryPoint = "https"
+  [acme.httpChallenge]
+  entryPoint = "http"
+
+# https://docs.traefik.io/configuration/logs/
+# Comment out the next line to enable Traefik's access logs.
+[accessLog]
+
