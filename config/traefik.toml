@@ -6,12 +6,14 @@ defaultEntryPoints = ["http", "https"]
 [entryPoints]
   [entryPoints.http]
   address = ":80"
+  
   # Uncomment the following two lines to redirect HTTP to HTTPS.
   #[entryPoints.http.redirect]
   #entryPoint = "https"
+  
   [entryPoints.https]
   address = ":443"
-    [entryPoints.https.tls]
+  [entryPoints.https.tls]
 
 # These options are for Traefik's integration with Docker.
 [docker]
@@ -19,6 +21,8 @@ endpoint = "unix:///var/run/docker.sock"
 domain = "docker.localhost"
 watch = true
 exposedByDefault = false
+
+[api]
 
 # These options are for Traefik's integration with Let's Encrypt.
 # Your certificates are stored inside /acme.json inside the container,

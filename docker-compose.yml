@@ -20,7 +20,7 @@ services:
   traefik:
     # https://hub.docker.com/_/traefik/
     image: traefik:alpine
-    command: --api --docker --acme.email="${ACME_EMAIL}"
+    command: --web --docker --acme.email="${ACME_EMAIL}"
     restart: always
     networks:
       - backend
@@ -33,11 +33,12 @@ services:
       # Map port 80 and 443 on the host to this container.
       - "80:80"
       - "443:443"
+      #- "8000:8080" # Traefik Dashboard
     labels:
       - "traefik.docker.network=frontend"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:${TRAEFIK_DOMAINS}; PathPrefixStrip:/traefik/"
-      - "traefik.port=80"
+      - "traefik.frontend.rule=Host:${TRAEFIK_DOMAINS}"
+      - "traefik.port=8080"
       - "traefik.protocol=http"
       # Remove next line to disable login prompt for the dashboard.
       #- "traefik.frontend.auth.basic=${BASIC_AUTH}"
@@ -71,8 +72,8 @@ services:
       MYSQL_USER: ${MATOMO_DB_USER}
       MYSQL_PASSWORD: ${MATOMO_DB_PASSWORD}
 
-  matomo:
-    image: matomo:latest
+  ghost:
+    image: ghost:latest
     links:
       - db
     networks:
@@ -80,14 +81,20 @@ services:
       - frontend
     volumes:
       # To allow you to view/edit Matomo configuration files:
-      - ./config/ghost:/var/www/html/config:rw
-      - ./logs:/var/www/html/logs
+      - ./content:/var/lib/ghost/content:rw
+      #- ./logs:/var/www/html/logs
     labels:
       - "traefik.docker.network=frontend"
       - "traefik.enable=true"
       - "traefik.frontend.rule=Host:${DOMAINS}"
-      - "traefik.port=80"
+      - "traefik.port=2368"
       - "traefik.protocol=http"
+    environment:
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: ${MATOMO_DB_USER}
+      database__connection__password: ${MATOMO_DB_PASSWORD}
+      database__connection__database: ${MATOMO_DB_NAME}
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
@@ -112,7 +119,7 @@ services:
     labels:
       - "traefik.docker.network=frontend"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:${MATOMO_DOMAINS}; PathPrefixStrip:/matomo/"
+      - "traefik.frontend.rule=Host:${MATOMO_DOMAINS}"
       - "traefik.port=80"
       - "traefik.protocol=http"
       # Uncomment the next line to enable HSTS header.
