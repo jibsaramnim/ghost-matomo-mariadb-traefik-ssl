@@ -20,24 +20,38 @@ services:
   traefik:
     # https://hub.docker.com/_/traefik/
     image: traefik:alpine
-    command: --web --docker --acme.email="${ACME_EMAIL}"
-    restart: always
+    command: 
+        - --web
+        - --entryPoints=Name:http Address::80 Redirect.EntryPoint:https
+        - --entryPoints=Name:https Address::443 TLS
+        - --defaultEntryPoints=http,https
+        - --docker
+        - --docker.endpoint=unix:///var/run/docker.sock
+        - --docker.domain=domain.localhost
+        - --docker.watch=true
+        - --acme
+        - --acme.storage=/etc/traefik/acme/acme.json
+        - --acme.email=${ACME_EMAIL}
+        - --acme.OnHostRule=true
+        - --acme.entryPoint=https
+        - --acme.httpChallenge.entrypoint=http
+    restart: unless-stopped
     networks:
       - backend
       - frontend
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/traefik.toml:/traefik.toml
-      - ./config/acme.json:/acme.json
+      # - ./config/traefik.toml:/traefik.toml
+      - ./config/acme:/etc/traefik/acme
     ports:
       # Map port 80 and 443 on the host to this container.
       - "80:80"
       - "443:443"
       #- "8000:8080" # Traefik Dashboard
     labels:
-      - "traefik.docker.network=frontend"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:${TRAEFIK_DOMAINS}"
+      - "traefik.docker.network=frontend"
+      - "traefik.frontend.rule=Host:${DOMAINS_TRAEFIK}"
       - "traefik.port=8080"
       - "traefik.protocol=http"
       # Remove next line to disable login prompt for the dashboard.
@@ -51,7 +65,7 @@ services:
     # https://github.com/v2tec/watchtower#options
     # This schedule applies updates (if available) at midnight.
     command: --cleanup --schedule "0 0 0 * * *"
-    restart: always
+    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -60,46 +74,49 @@ services:
     # Specify 10.3 as we only want watchtower to apply minor updates
     # (eg, 10.3.1) and not major updates (eg, 10.4).
     image: mariadb:10.3
-    restart: always
+    restart: unless-stopped
     networks:
       - backend
     volumes:
       # Ensure the database persists between restarts.
       - vol-db:/var/lib/mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${MATOMO_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MATOMO_DB_NAME}
-      MYSQL_USER: ${MATOMO_DB_USER}
-      MYSQL_PASSWORD: ${MATOMO_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    labels:
+      - "traefik.enable=false"
 
   ghost:
-    image: ghost:latest
+    image: ghost:2-alpine
+    restart: unless-stopped
     links:
       - db
     networks:
       - backend
       - frontend
     volumes:
-      # To allow you to view/edit Matomo configuration files:
-      - ./content:/var/lib/ghost/content:rw
+      - ./content:/var/lib/ghost/content
       #- ./logs:/var/www/html/logs
     labels:
       - "traefik.docker.network=frontend"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:${DOMAINS}"
+      - "traefik.frontend.rule=Host:${DOMAINS_BLOG}"
       - "traefik.port=2368"
       - "traefik.protocol=http"
     environment:
       database__client: mysql
       database__connection__host: db
-      database__connection__user: ${MATOMO_DB_USER}
-      database__connection__password: ${MATOMO_DB_PASSWORD}
-      database__connection__database: ${MATOMO_DB_NAME}
+      database__connection__database: ${DB_NAME}
+      database__connection__user: ${DB_USER}
+      database__connection__password: ${DB_PASSWORD}
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
   matomo:
-    image: matomo:latest
+    image: matomo:3
+    restart: unless-stopped
     links:
       - db
     networks:
@@ -117,11 +134,10 @@ services:
       #- /var/lib/GeoIP/GeoLite2-Country.mmdb:/var/www/html/misc/GeoLite2-Country.mmdb
       #- /var/lib/GeoIP/GeoLite2-ASN.mmdb:/var/www/html/misc/GeoLite2-ASN.mmdb
     labels:
-      - "traefik.docker.network=frontend"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:${MATOMO_DOMAINS}"
+      - "traefik.docker.network=frontend"
+      - "traefik.frontend.rule=Host:${DOMAINS_MATOMO}"
       - "traefik.port=80"
-      - "traefik.protocol=http"
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
@@ -143,7 +159,7 @@ services:
   #   environment:
   #     PMA_HOST: db
   #     PMA_ABSOLUTE_URI: /phpmyadmin/
-  #     MYSQL_ROOT_PASSWORD: ${MATOMO_DB_ROOT_PASSWORD}
+  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
   #   labels:
   #     - "traefik.docker.network=frontend"
   #     - "traefik.enable=true"
