@@ -18,7 +18,9 @@ services:
     # https://hub.docker.com/_/traefik/
     image: traefik:alpine
     command: 
-        - --web
+        # This enables the Traefik dashboard.
+        # Make sure you put this behind at least basic auth
+        #- --web
         - --entryPoints=Name:http Address::80 Redirect.EntryPoint:https
         - --entryPoints=Name:https Address::443 TLS
         - --defaultEntryPoints=http,https
