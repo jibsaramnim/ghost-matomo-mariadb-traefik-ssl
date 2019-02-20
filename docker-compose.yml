@@ -9,14 +9,11 @@ networks:
   frontend:
   backend:
 
-# Create persistent Docker volumes to preserve DB data.
 volumes:
   vol-db:
 
 services:
-  # Traefik is a reverse proxy. It handles SSL and passes traffic to
-  # Docker containers via rules you define in docker-compose labels.
-  # Its dashboard is at http://example.com/traefik/ (behind a login).
+    
   traefik:
     # https://hub.docker.com/_/traefik/
     image: traefik:alpine
@@ -54,11 +51,9 @@ services:
       - "traefik.frontend.rule=Host:${DOMAINS_TRAEFIK}"
       - "traefik.port=8080"
       - "traefik.protocol=http"
-      # Remove next line to disable login prompt for the dashboard.
+      # Enable the next line to enable a basic auth login prompt for the dashboard.
       #- "traefik.frontend.auth.basic=${BASIC_AUTH}"
 
-  # Watchtower detects if any linked containers have an new image
-  # available, automatically updating & restarting them if needed.
   watchtower:
     # https://hub.docker.com/r/centurylink/watchtower/
     image: v2tec/watchtower:latest
@@ -71,9 +66,8 @@ services:
 
   db:
     # https://hub.docker.com/_/mariadb/
-    # Specify 10.3 as we only want watchtower to apply minor updates
-    # (eg, 10.3.1) and not major updates (eg, 10.4).
     image: mariadb:10.3
+    command: --max_allowed_packet=256M
     restart: unless-stopped
     networks:
       - backend
@@ -85,10 +79,9 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
-    labels:
-      - "traefik.enable=false"
 
   ghost:
+    # https://hub.docker.com/_/ghost/
     image: ghost:2-alpine
     restart: unless-stopped
     links:
@@ -98,7 +91,6 @@ services:
       - frontend
     volumes:
       - ./content:/var/lib/ghost/content
-      #- ./logs:/var/www/html/logs
     labels:
       - "traefik.docker.network=frontend"
       - "traefik.enable=true"
@@ -106,11 +98,18 @@ services:
       - "traefik.port=2368"
       - "traefik.protocol=http"
     environment:
+      url: ${BLOG_URL}
       database__client: mysql
       database__connection__host: db
       database__connection__database: ${DB_NAME}
       database__connection__user: ${DB_USER}
       database__connection__password: ${DB_PASSWORD}
+      mail__transport: SMTP
+      mail__from: "Server <${ACME_EMAIL}>"
+      mail__options__service: SMTP
+      mail__options__host: mail
+      mail__options__port: 25
+
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
@@ -123,16 +122,8 @@ services:
       - backend
       - frontend
     volumes:
-      # To allow you to view/edit Matomo configuration files:
       - ./config/matomo:/var/www/html/config:rw
-      # To allow you to easily view Matomo log files:
-      - ./logs:/var/www/html/logs
-      # Install our own php.ini, which can be customized:
       - ./config/php.ini:/usr/local/etc/php/php.ini
-      # Use MaxMind GeoLite2 databases.
-      #- /var/lib/GeoIP/GeoLite2-City.mmdb:/var/www/html/misc/GeoLite2-City.mmdb
-      #- /var/lib/GeoIP/GeoLite2-Country.mmdb:/var/www/html/misc/GeoLite2-Country.mmdb
-      #- /var/lib/GeoIP/GeoLite2-ASN.mmdb:/var/www/html/misc/GeoLite2-ASN.mmdb
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
@@ -141,40 +132,11 @@ services:
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
-  # Navigate to http://example.com/phpmyadmin/ to manage your MySQL
-  # databases. (Don't forget the last forward slash.) Like the Traefik
-  # dashboard, this is behind a login prompt to help you stay secure.
-  # matomo-phpmyadmin:
-  #   # https://hub.docker.com/r/phpmyadmin/phpmyadmin/
-  #   image: phpmyadmin/phpmyadmin:latest
-  #   depends_on:
-  #     - db
-  #   restart: always
-  #   networks:
-  #     - backend
-  #     - frontend
-  #   volumes:
-  #     # Install our own php.ini, which can be customized.
-  #     - ./php.ini:/usr/local/etc/php/php.ini
-  #   environment:
-  #     PMA_HOST: db
-  #     PMA_ABSOLUTE_URI: /phpmyadmin/
-  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-  #   labels:
-  #     - "traefik.docker.network=frontend"
-  #     - "traefik.enable=true"
-  #     - "traefik.frontend.rule=Host:${MATOMO_DOMAINS}; PathPrefixStrip:/phpmyadmin/"
-  #     - "traefik.port=80"
-  #     - "traefik.protocol=http"
-  #     # Remove the next line if you don't want a browser login prompt.
-  #     - "traefik.frontend.auth.basic=${BASIC_AUTH}"
-
   # This allows Matomo to send email straight out of the box without
   # having to rely on an external provider like SendGrid or MailGun.
   # It makes an SMTP host available at the hostname "mail".
-  # mail:
-  #   image: bytemark/smtp
-  #   restart: always
-  #   networks:
-  #     - frontend
-
+  mail:
+    image: bytemark/smtp
+    restart: unless-stopped
+    networks:
+      - frontend
