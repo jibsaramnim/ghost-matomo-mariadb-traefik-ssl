@@ -1,2 +1,6 @@
 .env
 .DS_Store
+
+./config/acme
+./config/matomo
+./content

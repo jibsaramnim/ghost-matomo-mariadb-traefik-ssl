@@ -46,7 +46,6 @@ services:
       # Map port 80 and 443 on the host to this container.
       - "80:80"
       - "443:443"
-      #- "8000:8080" # Traefik Dashboard
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
@@ -134,10 +133,10 @@ services:
       # Uncomment the next line to enable HSTS header.
       #- "traefik.frontend.headers.STSSeconds=15768000"
 
-  # This allows Matomo to send email straight out of the box without
-  # having to rely on an external provider like SendGrid or MailGun.
+  # This allows Matomo and Ghost to send email straight out of the box.
   # It makes an SMTP host available at the hostname "mail".
   mail:
+    # https://hub.docker.com/r/bytemark/smtp
     image: bytemark/smtp
     restart: unless-stopped
     networks:
