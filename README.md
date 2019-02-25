@@ -1,4 +1,4 @@
-# Ghost, Matomo, MariaDB and Traefik stack for personal blogs
+# Ghost, Matomo, MariaDB and Traefik with SSL stack for personal blogs
 
 I have created a basic docker stack for using [Ghost](https://ghost.org), [Matomo](https://matomo.org), [MariaDB](https://mariadb.org) and [Traefik](https://traefik.io) for easyy deployment. The stack assumes you'll want everything behind HTTPS using Traefik's built-in Let's Encrypt functionality.
 
